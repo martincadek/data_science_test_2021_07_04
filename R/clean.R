@@ -58,6 +58,7 @@ data_usa_cars[, `:=`(
      condition_expired = ifelse(condition == "Listing Expired", TRUE, FALSE),
      condition_minutes_left = time_length(duration(gsub(x = condition, pattern = " left", "")), unit = "minute"),
      # group colours to those that are common and "other" (factorise)
+     # this is optional and I'll see if this is better than letting the algorithm decide how to group colours
      color_grouped = fcase(
           color == "white", "white",
           color == "black", "black",
