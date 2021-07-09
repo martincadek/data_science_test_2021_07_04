@@ -1,0 +1,107 @@
+---
+title: "Predicting the price of used cars"
+author: "Martin Cadek"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup_local, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(digits = 2)
+options(scipen = 999)
+```
+
+# Introduction
+
+The following report discusses the approach to create the final model that achieved the best performance to predict the price of used cars.
+
+# Basic EDA
+
+The following EDA was conducted to understand the data using `data.table`.
+
+Are there any NAs?
+
+```{r}
+sapply(raw_data, function(x){sum(is.na(x))}) # NAs
+```
+
+Are there any duplicated values?
+
+```{r}
+sapply(raw_data, function(x){uniqueN(x)}) # duplicated
+```
+
+Which are duplicated?
+
+```{r}
+raw_data[which(duplicated(vin)),] # duplicated extract
+```
+
+Further unusual values were also investigated, specifically, it was found that `r raw_data[price < 100, .N]` observations had price \< 100, `r raw_data[mileage < 10,.N]` had mileage \< 10, and `r raw_data[year < 1990,.N]` were older than 1990.
+
+Finally, both categorical and numerical values were investigated.
+
+The EDA findings led to the decision to remove any duplicated values, merge the brand and car of the model into a new variable called brand_model, coerce condition expired to a numerical variable, and remove all cars that had mileage or price of zero. The detailed process is in clean.R script. Cleaned data were saved as cleaned_USA_cars_datasets.csv and were used in further modelling.
+
+# Data pre-processing
+
+Before working with data, it was essential to pre-process them as some of the utilised models perform better when, for example, numerical values are on the same scale and centred.
+
+1.  The variables year, state, brand_model, and colour had their uncommon levels merged into a new level called other.
+2.  All nominal variables were one-hot encoded.
+3.  All numerical variables were scaled.
+4.  All numerical variables were centred.
+
+# Splitting and Cross-validation
+
+All of the data were split into training and test sets. The training set has been allocated 75% of the data. The testing set had been allocated the remaining 25% of all data.
+
+All models were trained using cross-validation that was set on k = 5 of folds. Higher rates could be used, but parallelisation would be necessary, and this was not implemented as it is unknown where else the code may be run.
+
+# Training the models
+
+The models were trained on the following dataset, with the outcome variable I aimed to predict was the price of the used cars.
+
+```{r}
+gg_explore_train
+```
+
+The following algorithms were selected:
+
+-   Random forests
+
+-   XGboost
+
+-   Lasso regression
+
+-   Ridge regression
+
+-   Linear (ordinary least squares) regression
+
+All models were trained using the specifications above, and tuning was implemented to include a range of possible values rather than a fixed value. For example, the Random forest model trees parameter was trained in the range from 500 to 1000.
+
+# Results
+
+The following performance was achieved across all trained models when they were predicted on test data. The best models were selected as the models that had the lowest RMSE from all the trained models in each fold.
+
+```{r}
+gg_best_models
+```
+
+The following performance was achieved across the models shown above.
+
+```{r}
+df_best_models_metrics %>% knitr::kable()
+```
+
+Investigating the metrics and lines of best fit presented above, it was determined that the best performing model was one of the iterations from Random forest algorithms.
+
+```{r}
+gg_the_best_model
+```
+
+The final model had the following performances across RMSE, RSQ, and MAE metrics.
+
+```{r}
+the_best_model_metrics %>% knitr::kable()
+```
