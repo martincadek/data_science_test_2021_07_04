@@ -1,8 +1,8 @@
-# WIP - implement parallel processing
-
 # load data ---------------------------------------------------------------
 (data_model <- fread("data/cleaned_USA_cars_datasets.csv"))
 setDF(data_model)
+
+cli_alert_info("Starting the model.R script, please wait...")
 
 # split -------------------------------------------------------------------
 # set seed 
@@ -50,11 +50,17 @@ model_xgboost <- boost_tree(mtry = tune(), trees = tune(), min_n = tune()) %>%
 
 # ridge regularization = 0
 # lasso regularization = 1
-model_glmnet <- linear_reg(penalty = tune(), mixture = 0) %>% 
+model_glmnet_ridge <- linear_reg(penalty = tune(), mixture = 0) %>% 
         set_mode("regression") %>%
         set_engine("glmnet")
 
-# define ols, define pls
+model_glmnet_lasso <- linear_reg(penalty = tune(), mixture = 1) %>% 
+        set_mode("regression") %>%
+        set_engine("glmnet")
+
+model_lm <- linear_reg() %>% 
+        set_mode("regression") %>%
+        set_engine("lm")
 
 # define grids ------------------------------------------------------------
 grid_rf <- grid_max_entropy(
@@ -63,14 +69,19 @@ grid_rf <- grid_max_entropy(
         min_n(range = c(2, 10)),
         size = 30)
 
-grid_glmnet <- grid_regular(
-        penalty(range = c(-5, 5)), levels = 50)
-
 grid_xgboost <- grid_max_entropy(
         mtry(range = c(1, 20)),
         trees(range = c(500, 1000)),
         min_n(range = c(2, 10)),
         size = 60)
+
+grid_glmnet_ridge <- grid_regular(
+        penalty(range = c(-5, 5)), levels = 50)
+
+# Set lower for lasso to avoid
+# A correlation computation is required, but `estimate` is constant and has 0 standard
+grid_glmnet_lasso <- grid_regular(
+        penalty(range = c(-3, 3)), levels = 50)
 
 # define workflows --------------------------------------------------------
 flow_rf <- workflow() %>% 
@@ -81,11 +92,17 @@ flow_xgboost <- workflow() %>%
         add_recipe(default_preprocessing) %>%
         add_model(model_xgboost)
 
-flow_glmnet <- workflow() %>% 
+flow_glmnet_ridge <- workflow() %>% 
         add_recipe(default_preprocessing) %>%
-        add_model(model_xgboost)
+        add_model(model_glmnet_ridge)
 
+flow_glmnet_lasso <- workflow() %>% 
+        add_recipe(default_preprocessing) %>%
+        add_model(model_glmnet_lasso)
 
+flow_glmnet_lm <- workflow() %>% 
+        add_recipe(default_preprocessing) %>%
+        add_model(model_lm)
 
 # define metrics ----------------------------------------------------------
 report_metrics <- metric_set(rmse, rsq, ccc)
@@ -102,151 +119,132 @@ fit_rf <- tune_grid(
 fit_xgboost <- tune_grid(
         flow_xgboost,
         resamples = cv_folds,
-        grid = grid_rf,
+        grid = grid_xgboost,
         metrics = report_metrics,
         control = control_grid(verbose = TRUE)
 )
 
-fit_glmnet <- tune_grid(
-        flow_glmnet,
+fit_glmnet_ridge <- tune_grid(
+        flow_glmnet_ridge,
         resamples = cv_folds,
-        grid = grid_rf,
+        grid = grid_glmnet_ridge,
         metrics = report_metrics,
         control = control_grid(verbose = TRUE)
 )
+
+fit_glmnet_lasso <- tune_grid(
+        flow_glmnet_lasso,
+        resamples = cv_folds,
+        grid = grid_glmnet_lasso,
+        metrics = report_metrics,
+        control = control_grid(verbose = TRUE)
+)
+
+
+fit_lm <- fit_resamples(
+        flow_glmnet_lm,
+        resamples = cv_folds,
+        metrics = report_metrics,
+        control = control_grid(verbose = TRUE)
+)
+
 
 # inspect and select ------------------------------------------------------
-fit_rf
-collect_metrics(fit_rf)
-autoplot(fit_rf, metric = "rmse")
-show_best(fit_rf, metric = "rmse")
-select_best(fit_rf, metric = "rmse")
+# useful only if inspected in interactive session
 
-fit_xgboost
-collect_metrics(fit_xgboost)
-autoplot(fit_xgboost, metric = "rmse")
-show_best(fit_xgboost, metric = "rmse")
-select_best(fit_xgboost, metric = "rmse")
-
-fit_glmnet
-collect_metrics(fit_glmnet)
-autoplot(fit_glmnet, metric = "rmse")
-show_best(fit_glmnet, metric = "rmse")
-select_best(fit_glmnet, metric = "rmse")
-
+# collect_metrics(fit_rf)
+# autoplot(fit_rf, metric = c("rmse", "rsq"))
+# show_best(fit_rf, metric = "rmse")
+# select_best(fit_rf, metric = "rmse")
 
 # fit[test] ---------------------------------------------------------------
 tuned_model_rf <- flow_rf %>% 
-        finalize_workflow(select_best(rf_fit, metric = "rmse")) %>% 
+        finalize_workflow(select_best(fit_rf, metric = "rmse")) %>% 
         fit(data = data_train)
 
-predict(tuned_model_rf, data_test)
+tuned_model_xgboost <- flow_xgboost %>% 
+        finalize_workflow(select_best(fit_xgboost, metric = "rmse")) %>% 
+        fit(data = data_train)
 
-augment(tuned_model_rf, new_data = data_test) %>%
-        rmse(truth = price, estimate = .pred)
+tuned_model_ridge <- flow_glmnet_ridge %>% 
+        finalize_workflow(select_best(fit_glmnet_ridge, metric = "rmse")) %>% 
+        fit(data = data_train)
+
+tuned_model_lasso <- flow_glmnet_lasso %>% 
+        finalize_workflow(select_best(fit_glmnet_lasso, metric = "rmse")) %>% 
+        fit(data = data_train)
+
+tuned_model_lm <- flow_glmnet_lm %>% 
+        finalize_workflow(select_best(fit_lm, metric = "rmse")) %>% 
+        fit(data = data_train)
 
 
 # visualise ---------------------------------------------------------------
+# visualise plots focusing on comparison of how models fit test data
+# save these for later use in the report
 df_best_models <-  select(data_test, price) %>%
         bind_cols(
                 predict(tuned_model_rf, new_data = data_test[, all_predictors]) %>%
-                        rename(`Random Forest` = .pred)
+                        rename(`Random Forest` = .pred),
+                predict(tuned_model_xgboost, new_data = data_test[, all_predictors]) %>%
+                        rename(`XGboost` = .pred),
+                predict(tuned_model_ridge, new_data = data_test[, all_predictors]) %>%
+                        rename(`Ridge Regression` = .pred),
+                predict(tuned_model_lasso, new_data = data_test[, all_predictors]) %>%
+                        rename(`Lasso Regression` = .pred),
+                predict(tuned_model_lm, new_data = data_test[, all_predictors]) %>%
+                        rename(`Linear Regression (OLS)` = .pred)
                 ) %>%
         pivot_longer(!price, names_to = "model", values_to = "prediction")
 
-(gg_best_models <- df_best_models %>% 
-        ggplot(aes(x = prediction, y = price)) + 
-        geom_abline(col = "red") + 
-        geom_point(alpha = .4) + 
-        facet_wrap(~model) + 
-        coord_fixed() +
-        labs(title = "Best models comparisons", y = "Price", x = "Prediction") +
-        theme_minimal())
+gg_best_models <- df_best_models %>% 
+                ggplot(aes(x = prediction, y = price)) + 
+                geom_point(alpha = .4) + 
+                geom_abline(col = "red") +
+                scale_y_continuous(labels = scales::dollar_format()) +
+                scale_x_continuous(labels = scales::dollar_format()) +
+                facet_wrap(~model) + 
+                #coord_fixed() +
+                labs(title = "Best models comparisons (Test data)", y = "Predicted price of used cars", x = "True price of used cars") +
+                theme_minimal()
+
+ggsave(filename = "plots/gg_best_models.png", plot = gg_best_models, 
+       width = 10, height = 5, dpi = 300, units = "in")
+
+# provide table of metrics
+df_best_models_metrics <- df_best_models %>%
+        group_by(model) %>%
+        metrics(price, prediction) %>%
+        arrange(.estimate)
+
+# additional visualisations -----------------------------------------------
+gg_explore_train <- data_train %>%
+        ggplot(aes(price)) +
+        geom_histogram(position = "identity", alpha = 0.5, bins = 20) +
+        scale_x_continuous(labels = scales::dollar_format()) +
+        labs(fill = NULL, x = "Price per car") +
+        theme_minimal()
+
+ggsave(filename = "plots/gg_explore_train.png", plot = gg_explore_train, 
+       width = 5, height = 5, dpi = 300, units = "in")
+
+the_best_model <- augment(tuned_model_rf, data_test)
+
+the_best_model_metrics <- metrics(the_best_model, price, .pred)
+
+gg_the_best_model <- the_best_model %>%
+        ggplot(aes(price, .pred)) +
+        geom_point(alpha = 0.2) +
+        geom_abline(slope = 1, lty = 2, color = "red") +
+        scale_y_continuous(labels = scales::dollar_format()) +
+        scale_x_continuous(labels = scales::dollar_format()) +
+        labs(title = "Best model predictions (Random Forest)", 
+             x = "True price of used cars", 
+             y = "Predicted price of used cars") +
+        theme_minimal()
+
+ggsave(filename = "plots/gg_the_best_model.png", plot = gg_the_best_model, 
+       width = 5, height = 5, dpi = 300, units = "in")
 
 
-
-# DEP BELOW ---------------------------------------------------------------
-# model - ranger ----------------------------------------------------------
-default_mtry <- floor(sqrt(length(all_predictors)))
-
-rf_settings <- rand_forest(mode = "regression", mtry = default_mtry, trees = 1000)
-
-rf_model <- rf_settings %>%
-     set_engine("ranger") %>%
-     fit_xy(
-          x = data_train[, all_predictors],
-          y = data_train$price
-          )
-
-rf_model
-
-# evaluation
-test_fits <- data_test %>%
-     select(price) %>%
-     bind_cols(
-          predict(rf_model, new_data = data_test[, all_predictors])
-     )
-
-test_fits %>% metrics(truth = price, estimate = .pred) 
-
-# model - glmnet ----------------------------------------------------------
-glmn_model <- linear_reg(penalty = 0.001, mixture = 0.5) %>% 
-     set_engine("glmnet") %>%
-     fit(price ~ ., data = bake(default_preprocessing, new_data = NULL))
-
-glmn_model
-
-
-
-# model - xgboost ---------------------------------------------------------
-# Specify model
-xgboost_model <- 
-        boost_tree(
-                mode = "regression",
-                trees = 1000,
-                min_n = tune(),
-                tree_depth = tune(),
-                learn_rate = tune(),
-                loss_reduction = tune()
-        ) %>%
-        set_engine("xgboost", objective = "reg:squarederror") %>%
-        fit(price ~ ., data = bake(default_preprocessing, new_data = NULL))
-
-# Specify grid
-xgboost_params <- 
-        parameters(
-                min_n(),
-                tree_depth(),
-                learn_rate(),
-                loss_reduction()
-        )
-
-xgboost_grid <- 
-        dials::grid_max_entropy(
-                xgboost_params, 
-                size = 60
-        )
-
-xgboost_grid
-
-# combine models ----------------------------------------------------------
-test_glmnet <- bake(default_preprocessing, new_data = data_test, all_predictors())
-
-test_fits <- test_fits %>%
-     rename(`random forest` = .pred) %>%
-     bind_cols(
-          predict(glmn_model, new_data = test_glmnet) %>%
-               rename(glmnet = .pred))
-
-test_fits %>% metrics(truth = price, estimate = .pred) 
-
-
-
-# compare models ----------------------------------------------------------
-test_fits %>% 
-     pivot_longer(!price, names_to = "model", values_to = "prediction") %>%
-     ggplot(aes(x = prediction, y = price)) + 
-     geom_abline(col = "green", lty = 2) + 
-     geom_point(alpha = .4) + 
-     facet_wrap(~model) + 
-     coord_fixed()
+cli_alert_success("The model.R script, has finished running.")

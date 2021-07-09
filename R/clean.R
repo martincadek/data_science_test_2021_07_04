@@ -1,7 +1,7 @@
 # load data ---------------------------------------------------------------
 cli_alert_info("Loading data...")
 (data_usa_cars <- fread("data/USA_cars_datasets.csv"))
-
+raw_data <- fread("data/USA_cars_datasets.csv")
 # What's what:
 # price = Can or USD dollars
 # brand = car
@@ -19,6 +19,7 @@ cli_alert_info("Loading data...")
 cli_alert_info("Exploring data...")
 columns_to_drop <- c("V1") # remove row col
 data_usa_cars[, (columns_to_drop) := NULL]
+raw_data[, (columns_to_drop) := NULL] # for report only
 
 # save default numeric and characters
 columns_numeric <- names(data_usa_cars)[sapply(data_usa_cars, is.numeric)]
@@ -83,6 +84,6 @@ fwrite(data_usa_cars, file = "data/cleaned_USA_cars_datasets.csv")
 fwrite(potential_outliers, file = "data/potential_outliers.csv")
 
 cli_alert_info("Cleaning workspace...")
-rm(columns_character, columns_numeric, columns_to_drop, data_usa_cars, potential_outliers)
+rm(columns_character, columns_numeric, columns_to_drop, potential_outliers)
 
 cli_alert_success("clean.R finished")
