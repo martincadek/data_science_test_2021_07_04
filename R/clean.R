@@ -2,18 +2,6 @@
 cli_alert_info("Loading data...")
 (data_usa_cars <- fread("data/USA_cars_datasets.csv"))
 raw_data <- fread("data/USA_cars_datasets.csv")
-# What's what:
-# price = Can or USD dollars
-# brand = car
-# model = car
-# title_status = clean / pay for damages
-# mileage
-# color = 49 types
-# vin = vehicle identification number
-# lot = manufacturer number
-# state = USA / Canada states
-# country = USA/CAN
-# condition = auction time
 
 # explore / wrangle -------------------------------------------------------
 cli_alert_info("Exploring data...")
@@ -80,6 +68,7 @@ cli_alert("Removing observations with null price and mileage...")
 data_usa_cars <- data_usa_cars[price > 0][mileage > 0]
 
 # save --------------------------------------------------------------------
+# save data
 fwrite(data_usa_cars, file = "data/cleaned_USA_cars_datasets.csv")
 fwrite(potential_outliers, file = "data/potential_outliers.csv")
 
