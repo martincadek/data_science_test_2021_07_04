@@ -18,5 +18,3 @@ From the supplied dataset (USA_cars_datasets.csv) build a model to predict the p
 The modelling and outputs should be developed in Python and supplied in a Jupyter notebook. This should be suitable for review with other Data Scientists so the steps and methods should be clear, but presentation is not a high priority.
 
 This should be submitted to your interviews in advance of your second interview.
-
-# SessionInfo
