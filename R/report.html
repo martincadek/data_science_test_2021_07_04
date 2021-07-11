@@ -174,7 +174,7 @@ pre code {
 
 <div id="introduction" class="section level1">
 <h1>Introduction</h1>
-<p>The following report discusses the approach to create the final model that achieved the best performance to predict the price of used cars.</p>
+<p>The following report discusses the approach to create the final model that achieved the best performance to predict the price of used cars. The core packages used in this analysis are <code>data.table</code> and <code>tidymodels</code>.</p>
 </div>
 <div id="basic-eda" class="section level1">
 <h1>Basic EDA</h1>
@@ -217,7 +217,7 @@ pre code {
 <div id="splitting-and-cross-validation" class="section level1">
 <h1>Splitting and Cross-validation</h1>
 <p>All of the data were split into training and test sets. The training set has been allocated 75% of the data. The testing set had been allocated the remaining 25% of all data.</p>
-<p>All models were trained using cross-validation that was set on k = 5 of folds. Higher rates could be used, but parallelisation would be necessary, and this was not implemented as it is unknown where else the code may be run.</p>
+<p>All models were trained using cross-validation that was set on k = 5 of folds. Higher rates could be used, but parallelisation would be necessary, and this was not implemented as it is unknown where else the code may be run. The cross-validation did not implement stratification or repeats.</p>
 </div>
 <div id="training-the-models" class="section level1">
 <h1>Training the models</h1>
@@ -232,6 +232,15 @@ pre code {
 <li><p>Linear (ordinary least squares) regression</p></li>
 </ul>
 <p>All models were trained using the specifications above, and tuning was implemented to include a range of possible values rather than a fixed value. For example, the Random forest model trees parameter was trained in the range from 500 to 1000.</p>
+</div>
+<div id="metrics" class="section level1">
+<h1>Metrics</h1>
+<p>The following metrics were used to determined the accuracy of the models.</p>
+<ul>
+<li><p>Mean absolute error (<em>MAE</em>) provides errors in the same units as the original data and measures the accuracy of the models.</p></li>
+<li><p>Root mean squared error (<em>RMSE</em>) also provides the same units as the original data. This was the metric used to determine the accuracy of the models.</p></li>
+<li><p>Coefficient of determination or R squared (<em>RSQ</em>) is a squared correlation between truth and estimate and can be interpreted as “variance explained” or, more formally, a goodness of fit.</p></li>
+</ul>
 </div>
 <div id="results" class="section level1">
 <h1>Results</h1>

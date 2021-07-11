@@ -13,7 +13,7 @@ options(scipen = 999)
 
 # Introduction
 
-The following report discusses the approach to create the final model that achieved the best performance to predict the price of used cars.
+The following report discusses the approach to create the final model that achieved the best performance to predict the price of used cars. The core packages used in this analysis are `data.table` and `tidymodels`.
 
 # Basic EDA
 
@@ -56,7 +56,7 @@ Before working with data, it was essential to pre-process them as some of the ut
 
 All of the data were split into training and test sets. The training set has been allocated 75% of the data. The testing set had been allocated the remaining 25% of all data.
 
-All models were trained using cross-validation that was set on k = 5 of folds. Higher rates could be used, but parallelisation would be necessary, and this was not implemented as it is unknown where else the code may be run.
+All models were trained using cross-validation that was set on k = 5 of folds. Higher rates could be used, but parallelisation would be necessary, and this was not implemented as it is unknown where else the code may be run. The cross-validation did not implement stratification or repeats.
 
 # Training the models
 
@@ -79,6 +79,16 @@ The following algorithms were selected:
 -   Linear (ordinary least squares) regression
 
 All models were trained using the specifications above, and tuning was implemented to include a range of possible values rather than a fixed value. For example, the Random forest model trees parameter was trained in the range from 500 to 1000.
+
+# Metrics
+
+The following metrics were used to determined the accuracy of the models.
+
+-   Mean absolute error (*MAE*) provides errors in the same units as the original data and measures the accuracy of the models.
+
+-   Root mean squared error (*RMSE*) also provides the same units as the original data. This was the metric used to determine the accuracy of the models.
+
+-   Coefficient of determination or R squared (*RSQ*) is a squared correlation between truth and estimate and can be interpreted as "variance explained" or, more formally, a goodness of fit.
 
 # Results
 
